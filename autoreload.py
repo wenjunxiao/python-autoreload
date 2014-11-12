@@ -5,7 +5,7 @@ changes is detected.
 """
 __author__="Wenjun Xiao"
 
-import os,sys,time,subprocess,thread
+import os,sys,time,subprocess,thread,signal
 
 def iter_module_files():
     for module in sys.modules.values():
@@ -35,12 +35,23 @@ def start_change_detector():
             sys.exit(3)
         time.sleep(1)
 
+_sub_proc = None
+
+def signal_handler(*args):
+    if _sub_proc:
+        print "[%s]Stop subprocess:%s" % (os.getpid(), _sub_proc.pid)
+        _sub_proc.terminate()
+    sys.exit(0)
+
 def restart_with_reloader():
+    signal.signal(signal.SIGTERM, signal_handler)
     while 1:
         args = [sys.executable] + sys.argv
         new_env = os.environ.copy()
         new_env['RUN_FLAG'] = 'true'
-        exit_code = subprocess.call(args, env=new_env)
+        global _sub_proc
+        _sub_proc = subprocess.Popen(args, env=new_env)
+        exit_code = _sub_proc.wait()
         if exit_code != 3:
             return exit_code
 
